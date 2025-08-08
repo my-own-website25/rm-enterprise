@@ -185,35 +185,9 @@
             color: #4c51bf;
             border-bottom-color: #4c51bf;
         }
-        /* Toast Notification */
-        #toast {
-            visibility: hidden;
-            min-width: 250px;
-            margin-left: -125px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 8px;
-            padding: 16px;
-            position: fixed;
-            z-index: 100;
-            left: 50%;
-            bottom: 30px;
-            font-size: 17px;
-            opacity: 0;
-            transition: opacity 0.5s, bottom 0.5s;
-        }
-
-        #toast.show {
-            visibility: visible;
-            opacity: 1;
-            bottom: 50px;
-        }
     </style>
 </head>
 <body class="font-sans">
-
-    <div id="toast"></div>
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         <header class="text-center mb-10 p-8 rounded-xl header-gradient text-white shadow-lg">
@@ -261,12 +235,12 @@
                         <input type="number" id="productPrice" placeholder="Price" class="form-input w-full" step="0.01" required>
                     </div>
                     <div>
-                        <label for="productSize" class="block text-sm font-medium text-gray-700 mb-1">Size</label>
-                        <input type="text" id="productSize" placeholder="e.g., 10x10.5" class="form-input w-full" required>
+                        <label for="productSize" class="block text-sm font-medium text-gray-700 mb-1">Size (Optional)</label>
+                        <input type="text" id="productSize" placeholder="e.g., 10x10.5" class="form-input w-full">
                     </div>
                      <div>
                         <label for="productUnit" class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                         <select id="productUnit" class="form-input w-full" required>
+                         <select id="productUnit" class="form-input w-full">
                             <option value="mm">mm</option>
                             <option value="cm" selected>cm</option>
                             <option value="m">m</option>
@@ -526,12 +500,12 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="mb-4">
-                        <label for="editProductSize" class="block text-sm font-medium text-gray-700 mb-1">Product Size</label>
-                        <input type="text" id="editProductSize" class="form-input w-full" required>
+                        <label for="editProductSize" class="block text-sm font-medium text-gray-700 mb-1">Size (Optional)</label>
+                        <input type="text" id="editProductSize" class="form-input w-full">
                     </div>
                     <div class="mb-4">
                         <label for="editProductUnit" class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                        <select id="editProductUnit" class="form-input w-full" required>
+                        <select id="editProductUnit" class="form-input w-full">
                             <option value="mm">mm</option>
                             <option value="cm">cm</option>
                             <option value="m">m</option>
@@ -591,7 +565,7 @@
 
     <script type="module">
         // --- 1. PASTE YOUR FIREBASE CONFIGURATION HERE ---
-        const firebaseConfig = {
+     const firebaseConfig = {
   apiKey: "AIzaSyDFeu_5mCLXNLXJSDFj8295axqKPQEm7-A",
   authDomain: "rm-enterprise-inventory-7d5e2.firebaseapp.com",
   projectId: "rm-enterprise-inventory-7d5e2",
@@ -599,10 +573,9 @@
   messagingSenderId: "220291442794",
   appId: "1:220291442794:web:17d00fa45abdbc21364213"
 };
-
         // --- 2. FIREBASE INITIALIZATION (DO NOT CHANGE) ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -611,7 +584,7 @@
         let categories = [];
         let inventory = [];
         let customers = [];
-        let soldItemsLog = [];
+        let sales = [];
         let cart = [];
 
         // --- DOM Elements ---
@@ -641,7 +614,6 @@
         const productSearchPOSInput = document.getElementById('productSearchPOS');
         const customerSearchPOSInput = document.getElementById('customerSearchPOS');
         const soldItemsSearchInput = document.getElementById('soldItemsSearch');
-        const toast = document.getElementById('toast');
 
         // Modal elements
         const receiptModal = document.getElementById('receiptModal');
@@ -695,10 +667,8 @@
                     renderAvailableProducts();
                     renderCustomerOptions();
                      const today = new Date();
-                    const offset = today.getTimezoneOffset();
-                    const todayLocal = new Date(today.getTime() - (offset*60*1000));
-                    itemsDateFilter.value = todayLocal.toISOString().split('T')[0];
-                    displaySoldItemsLog(todayLocal);
+                    itemsDateFilter.valueAsDate = today;
+                    displaySoldItemsLog(today);
                 }
                 if (key === 'customers') {
                     renderCustomers();
@@ -866,7 +836,7 @@
                 await addDoc(collection(db, "categories"), { name: newCategoryName });
                 newCategoryNameInput.value = '';
                 addCategoryModal.style.display = 'none';
-            } else if (categories.find(c => c.name === newCategoryName)) {
+            } else if (categories.includes(newCategoryName)) {
                 alert('Category already exists.');
             }
         });
@@ -897,7 +867,7 @@
                     <td>${item.category}</td>
                     <td>${item.quantity}</td>
                     <td>${item.price.toFixed(0)} tk</td>
-                    <td>${item.size} ${item.unit}</td>
+                    <td>${item.size ? `${item.size} ${item.unit}`: 'N/A'}</td>
                     <td class="flex gap-2">
                         <button class="text-blue-500 hover:text-blue-700 transition" onclick="openEditModal('${item.id}')"><i class="fas fa-edit"></i></button>
                         <button class="text-red-500 hover:text-red-700 transition" onclick="deleteProduct('${item.id}')"><i class="fas fa-trash"></i></button>
@@ -935,8 +905,8 @@
                 document.getElementById('editProductName').value = product.name;
                 document.getElementById('editProductQuantity').value = product.quantity;
                 document.getElementById('editProductPrice').value = product.price;
-                document.getElementById('editProductSize').value = product.size;
-                document.getElementById('editProductUnit').value = product.unit;
+                document.getElementById('editProductSize').value = product.size || '';
+                document.getElementById('editProductUnit').value = product.unit || 'cm';
                 editProductModal.style.display = 'block';
             }
         }
@@ -975,7 +945,7 @@
                 row.innerHTML = `
                     <td class="font-medium text-primary">${item.name}</td>
                     <td>${item.category}</td>
-                    <td>${item.size} ${item.unit}</td>
+                    <td>${item.size ? `${item.size} ${item.unit}`: 'N/A'}</td>
                     <td>${item.quantity}</td>
                     <td>${item.price.toFixed(0)} tk</td>
                     <td>
@@ -999,7 +969,7 @@
                     alert('Cannot add more than available quantity.');
                 }
             } else {
-                cart.push({ ...product, quantity: 1 });
+                cart.push({ ...product, quantity: 1, originalQuantity: product.quantity });
             }
             renderCart();
         }
@@ -1019,7 +989,7 @@
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td class="font-medium text-primary text-sm">${item.name}<br><span class="text-xs text-gray-500">${item.category} | ${item.size} ${item.unit}</span></td>
+                    <td class="font-medium text-primary text-sm">${item.name}<br><span class="text-xs text-gray-500">${item.category} ${item.size ? `| ${item.size} ${item.unit}` : ''}</span></td>
                     <td>
                         <input type="number" min="1" max="${productInInventory.quantity}" value="${item.quantity}" class="w-16 p-1 border rounded text-center" onchange="updateCartQuantity('${item.id}', this.value)">
                     </td>
@@ -1133,13 +1103,13 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="py-2 px-3 text-left">${item.name}<br><span class="text-xs text-gray-500">${item.category}</span></td>
-                    <td class="py-2 px-3 text-left">${item.size} ${item.unit}</td>
+                    <td class="py-2 px-3 text-left">${item.size ? `${item.size} ${item.unit}`: 'N/A'}</td>
                     <td class="py-2 px-3 text-center">${item.quantity}</td>
                     <td class="py-2 px-3 text-right">${item.price.toFixed(0)} tk</td>
                     <td class="py-2 px-3 text-right font-medium">${subtotal.toFixed(0)} tk</td>
                 `;
                 receiptItemsTable.appendChild(row);
-                tableData.push([`${item.name} (${item.category})`, `${item.size} ${item.unit}`, item.quantity, `${item.price.toFixed(0)} tk`, `${subtotal.toFixed(0)} tk`]);
+                tableData.push([`${item.name} (${item.category})`, `${item.size ? `${item.size} ${item.unit}`: 'N/A'}`, item.quantity, `${item.price.toFixed(0)} tk`, `${subtotal.toFixed(0)} tk`]);
             });
 
             document.getElementById('receiptTotal').textContent = receipt.total.toFixed(0);
@@ -1238,36 +1208,53 @@
                 soldItemsDateSpan.textContent = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             }
 
-            const itemsForDay = soldItemsLog.filter(item => 
-                new Date(item.date).toLocaleDateString('en-CA') === dateString
+            const salesForDay = sales.filter(sale => 
+                new Date(sale.date.seconds * 1000).toLocaleDateString('en-CA') === dateString
             );
 
             soldItemsList.innerHTML = '';
-            if (itemsForDay.length === 0) {
-                soldItemsList.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500">No items sold on this date.</td></tr>`;
+            if (salesForDay.length === 0) {
+                soldItemsList.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500">No items sold on this date.</td></tr>`;
                 return;
             }
 
-            itemsForDay.forEach(item => {
+            salesForDay.forEach(sale => {
                 const row = document.createElement('tr');
+                let itemsHtml = '<ul class="list-disc pl-5">';
+                sale.items.forEach(item => {
+                    itemsHtml += `<li>${item.quantity}x ${item.name}</li>`;
+                });
+                itemsHtml += '</ul>';
+
                 row.innerHTML = `
-                    <td>${new Date(item.date).toLocaleTimeString()}</td>
-                    <td>${item.customerName}</td>
-                    <td>${item.productName}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.total.toFixed(0)} tk</td>
+                    <td>${new Date(sale.date.seconds * 1000).toLocaleTimeString()}</td>
+                    <td>${sale.customerName}</td>
+                    <td>${itemsHtml}</td>
+                    <td>${sale.total.toFixed(0)} tk</td>
                 `;
                 soldItemsList.appendChild(row);
             });
         }
 
         exportItemsExcelBtn.addEventListener('click', () => {
-            if (soldItemsLog.length === 0) {
+            const excelData = sales.flatMap(sale => 
+                sale.items.map(item => ({
+                    'Receipt ID': sale.id,
+                    'Date': new Date(sale.date.seconds * 1000).toLocaleString(),
+                    'Customer Name': sale.customerName,
+                    'Product Name': item.name,
+                    'Quantity': item.quantity,
+                    'Unit Price (tk)': item.price,
+                    'Subtotal (tk)': item.total
+                }))
+            );
+
+            if (excelData.length === 0) {
                 alert("No sales data to export.");
                 return;
             }
 
-            const worksheet = XLSX.utils.json_to_sheet(soldItemsLog);
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Sold Items Report");
             XLSX.writeFile(workbook, "RM_ENTERPRISE_Items_Report.xlsx");
@@ -1296,17 +1283,10 @@
                 });
 
                 onSnapshot(collection(db, "sales"), (snapshot) => {
-                    soldItemsLog = snapshot.docs.map(doc => {
-                        const data = doc.data();
-                        return {
-                            ...data,
-                            date: data.date.toDate() // Convert Firestore Timestamp to JS Date
-                        };
-                    });
+                    sales = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     const today = new Date();
-                    const offset = today.getTimezoneOffset();
-                    const todayLocal = new Date(today.getTime() - (offset*60*1000));
-                    displaySoldItemsLog(todayLocal);
+                    itemsDateFilter.valueAsDate = today;
+                    displaySoldItemsLog(today);
                 });
                 
                 inventorySearchInput.addEventListener('input', renderInventory);
