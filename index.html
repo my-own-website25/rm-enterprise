@@ -324,7 +324,6 @@
         </div>
     </div>
 
-    <!-- FIX: Added Edit Category and Confirmation Modals -->
     <div id="editCategoryModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-50 items-center justify-center overflow-y-auto p-4">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
             <h3 class="text-2xl font-bold mb-6">Edit Category</h3>
@@ -358,13 +357,13 @@
     <!-- Firebase SDK -->
     <script type="module">
         // Firebase Config
-       const firebaseConfig = {
-  apiKey: "AIzaSyAcKVnZcdcQViDRimjq0LBEweu0f_S5Vfw",
-  authDomain: "rm-enterprise-full-inventory.firebaseapp.com",
-  projectId: "rm-enterprise-full-inventory",
-  storageBucket: "rm-enterprise-full-inventory.firebasestorage.app",
-  messagingSenderId: "361419415668",
-  appId: "1:361419415668:web:836c9adae6ff129971f121"
+     const firebaseConfig = {
+  apiKey: "AIzaSyBL6cYVFzklJwFmxs1hYsZIWDWMIpZgXYk",
+  authDomain: "rm-inventory-system.firebaseapp.com",
+  projectId: "rm-inventory-system",
+  storageBucket: "rm-inventory-system.firebasestorage.app",
+  messagingSenderId: "331319877706",
+  appId: "1:331319877706:web:fcb900cf035d01a8cb06b3"
 };
         if (typeof __firebase_config !== 'undefined') { Object.assign(firebaseConfig, JSON.parse(__firebase_config)); }
 
@@ -719,8 +718,37 @@
 
             try {
                 if (saleId) { // Editing an existing sale
+                    const originalSale = allSales.find(s => s.id === saleId);
+                    if (!originalSale) {
+                        console.error("Original sale not found for editing!");
+                        return;
+                    }
+
+                    const originalQuantities = {};
+                    originalSale.items.forEach(item => { originalQuantities[item.id] = item.quantity; });
+
+                    const newQuantities = {};
+                    saleItems.forEach(item => { newQuantities[item.id] = item.quantity; });
+
+                    const allItemIds = new Set([...Object.keys(originalQuantities), ...Object.keys(newQuantities)]);
+
+                    for (const itemId of allItemIds) {
+                        const originalQty = originalQuantities[itemId] || 0;
+                        const newQty = newQuantities[itemId] || 0;
+                        const quantityDifference = newQty - originalQty;
+
+                        if (quantityDifference !== 0) {
+                            const itemRef = doc(db, `artifacts/${appId}/users/${currentUserId}/items`, itemId);
+                            const dbItem = allItems.find(i => i.id === itemId);
+                            if (dbItem) {
+                                const newStock = dbItem.stock - quantityDifference;
+                                await updateDoc(itemRef, { stock: newStock });
+                            }
+                        }
+                    }
                     const saleRef = doc(db, `artifacts/${appId}/users/${currentUserId}/sales`, saleId);
                     await updateDoc(saleRef, saleData);
+
                 } else { // Creating a new sale
                     await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/sales`), saleData);
                     for (const item of saleItems) {
@@ -843,7 +871,6 @@
             document.getElementById('confirmModalMessage').textContent = message;
             const confirmButton = document.getElementById('confirmModalButton');
             
-            // Clone and replace the button to remove old event listeners
             const newConfirmButton = confirmButton.cloneNode(true);
             confirmButton.parentNode.replaceChild(newConfirmButton, confirmButton);
 
@@ -974,4 +1001,3 @@
     </script>
 </body>
 </html>
-
