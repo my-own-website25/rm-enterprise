@@ -59,7 +59,12 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <div class="container mx-auto p-4 md:p-6 lg:p-8">
+    <!-- NEW: Status Bar -->
+    <div id="statusBar" class="fixed top-0 left-0 right-0 p-2 text-center text-white bg-gray-500 transition-colors duration-500 z-50">
+        Connecting...
+    </div>
+
+    <div class="container mx-auto p-4 md:p-6 lg:p-8 mt-12">
         <header class="bg-white shadow-lg rounded-xl p-6 mb-8">
             <h1 class="text-4xl md:text-5xl font-bold text-center text-slate-900">RM ENTERPRISE</h1>
             <p class="text-center text-slate-500 mt-1">Hardware Inventory Management System</p>
@@ -354,10 +359,10 @@
         <p class="text-slate-500 text-sm">Email: istemamahmed@outlook.com</p>
     </footer>
 
-   <!-- Firebase SDK -->
+    <!-- Firebase SDK -->
     <script type="module">
         // Firebase Config
-const firebaseConfig = {
+      const firebaseConfig = {
   apiKey: "AIzaSyBL6cYVFzklJwFmxs1hYsZIWDWMIpZgXYk",
   authDomain: "rm-inventory-system.firebaseapp.com",
   projectId: "rm-inventory-system",
@@ -386,28 +391,39 @@ const firebaseConfig = {
         let allCustomers = [];
         let allCategories = [];
 
+        // --- NEW: Status Bar Function ---
+        const statusBar = document.getElementById('statusBar');
+        function updateStatus(message, isError = false) {
+            statusBar.textContent = message;
+            statusBar.classList.toggle('bg-red-500', isError);
+            statusBar.classList.toggle('bg-green-500', !isError && message === 'Online');
+            statusBar.classList.toggle('bg-gray-500', !isError && message !== 'Online');
+        }
+
         // --- AUTHENTICATION ---
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUserId = user.uid;
-                console.log("Authentication successful. User ID:", currentUserId);
+                updateStatus('Online');
                 loadAllData();
             } else {
-                console.log("No user signed in. Attempting anonymous sign-in.");
+                updateStatus('Authenticating...');
                 try {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
                         await signInAnonymously(auth);
                     }
-                } catch (error) { console.error("CRITICAL: Anonymous sign-in failed:", error); }
+                } catch (error) { 
+                    updateStatus(`Authentication Failed: ${error.message}`, true);
+                }
             }
         });
 
         // --- DATA LOADING & LISTENERS ---
         function loadAllData() {
             if (!currentUserId) {
-                console.error("Cannot load data: No User ID.");
+                updateStatus("Error: No User ID for loading data.", true);
                 return;
             }
             document.getElementById('salesDate').valueAsDate = new Date();
@@ -419,25 +435,25 @@ const firebaseConfig = {
             onSnapshot(collection(db, `${path}/categories`), snap => {
                 allCategories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 populateCategoryUI(allCategories);
-            }, err => console.error("Category listener failed:", err));
+            }, err => updateStatus(`Error loading categories: ${err.message}`, true));
 
             onSnapshot(collection(db, `${path}/items`), snap => {
                 allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 populateItemTable(allItems);
                 populateSaleItemDropdown(allItems);
-            }, err => console.error("Item listener failed:", err));
+            }, err => updateStatus(`Error loading items: ${err.message}`, true));
             
             onSnapshot(collection(db, `${path}/customers`), snap => {
                 allCustomers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 populateCustomerTable(allCustomers);
                 populateSaleCustomerDropdown(allCustomers);
-            }, err => console.error("Customer listener failed:", err));
+            }, err => updateStatus(`Error loading customers: ${err.message}`, true));
 
             onSnapshot(collection(db, `${path}/sales`), snap => {
                 allSales = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 populateSalesLogTable(allSales);
                 updateDashboard();
-            }, err => console.error("Sales listener failed:", err));
+            }, err => updateStatus(`Error loading sales: ${err.message}`, true));
         }
         
         // --- UI POPULATION & RENDERING ---
@@ -631,36 +647,24 @@ const firebaseConfig = {
             `;
         }
 
-        // --- MODIFIED FUNCTION WITH DIAGNOSTICS ---
         async function addCategory() {
             const nameInput = document.getElementById('newCategoryName');
             const name = nameInput.value.trim();
-
-            // --- DIAGNOSTIC LOGS START ---
-            console.log("Attempting to add category...");
-            console.log("Is user signed in? User ID:", currentUserId);
-            // --- DIAGNOSTIC LOGS END ---
-
             if (name && currentUserId) {
                 try {
-                    const docRef = await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/categories`), { name });
-                    console.log("SUCCESS: Category added with ID:", docRef.id);
+                    await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/categories`), { name });
                     nameInput.value = '';
                 } catch (e) {
-                    // This will catch and display the specific Firebase error
-                    console.error("FIREBASE ERROR:", e.message);
-                    alert("Failed to save category. Please check the browser console for errors (Right-click > Inspect > Console). The error is likely 'PERMISSION_DENIED'.");
+                    updateStatus(`Save Error: ${e.message}`, true);
                 }
-            } else {
-                console.error("FAILED: Cannot add category. User is not signed in (currentUserId is null) or name is empty.");
-                alert("Cannot save category because the app is not connected to the user account. Please ensure Anonymous Sign-in is enabled in your Firebase project's Authentication settings.");
+            } else if (!currentUserId) {
+                updateStatus("Save Error: Not authenticated.", true);
             }
         }
 
-
         async function handleItemFormSubmit(e) {
             e.preventDefault();
-            if (!currentUserId) return;
+            if (!currentUserId) { updateStatus("Save Error: Not authenticated.", true); return; }
             const id = document.getElementById('itemId').value;
             const itemData = {
                 name: document.getElementById('itemName').value,
@@ -678,13 +682,13 @@ const firebaseConfig = {
                 }
                 closeModal(document.querySelector('#itemModal'));
             } catch (err) {
-                console.error("Error saving item: ", err);
+                updateStatus(`Save Error: ${err.message}`, true);
             }
         }
 
         async function handleCustomerFormSubmit(e) {
             e.preventDefault();
-            if (!currentUserId) return;
+            if (!currentUserId) { updateStatus("Save Error: Not authenticated.", true); return; }
             const id = document.getElementById('customerId').value;
             
             const customerData = {
@@ -708,13 +712,13 @@ const firebaseConfig = {
                 }
                 closeModal(document.querySelector('#customerModal'));
             } catch (err) {
-                console.error("Error saving customer: ", err);
+                updateStatus(`Save Error: ${err.message}`, true);
             }
         }
         
         async function handleSaleFormSubmit(e) {
             e.preventDefault();
-            if (!currentUserId) return;
+            if (!currentUserId) { updateStatus("Save Error: Not authenticated.", true); return; }
             const saleId = document.getElementById('saleId').value;
             const customerId = document.getElementById('saleCustomer').value;
             const customerDoc = await getDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/customers`, customerId));
@@ -780,7 +784,7 @@ const firebaseConfig = {
                 }
                 closeModal(document.querySelector('#saleModal'));
             } catch (err) {
-                console.error("Error saving sale: ", err);
+                updateStatus(`Save Error: ${err.message}`, true);
             }
         }
 
@@ -793,7 +797,7 @@ const firebaseConfig = {
                     await updateDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/categories`, id), { name: newName });
                     closeModal(document.querySelector('#editCategoryModal'));
                 } catch (err) {
-                    console.error("Error updating category:", err);
+                    updateStatus(`Save Error: ${err.message}`, true);
                 }
             }
         }
@@ -918,7 +922,7 @@ const firebaseConfig = {
             openConfirmationModal('Delete Item', 'Are you sure you want to delete this item?', async () => {
                 try {
                     await deleteDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/items`, id));
-                } catch (e) { console.error("Error deleting item: ", e); }
+                } catch (e) { updateStatus(`Delete Error: ${e.message}`, true); }
             });
         }
         
@@ -939,7 +943,7 @@ const firebaseConfig = {
             openConfirmationModal('Delete Customer', 'Are you sure you want to delete this customer?', async () => {
                 try {
                     await deleteDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/customers`, id));
-                } catch (e) { console.error("Error deleting customer: ", e); }
+                } catch (e) { updateStatus(`Delete Error: ${e.message}`, true); }
             });
         }
 
@@ -956,7 +960,7 @@ const firebaseConfig = {
             openConfirmationModal('Delete Category', 'Are you sure you want to delete this category?', async () => {
                 try {
                     await deleteDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/categories`, id));
-                } catch (e) { console.error("Error deleting category: ", e); }
+                } catch (e) { updateStatus(`Delete Error: ${e.message}`, true); }
             });
         }
 
@@ -1020,6 +1024,17 @@ const firebaseConfig = {
     </script>
 </body>
 </html>
+```
 
+### **What to Do Now**
 
+1.  **Deploy the new code.**
+2.  Open your live website on two different browsers or devices.
+3.  Look at the **status bar** at the top of the page.
 
+Now, when you try to add data, one of two things will happen:
+
+* **If it works:** The status bar will stay green and say "Online," and your data will sync. The problem is solved!
+* **If it fails:** The status bar will turn **red** and display the exact error message from Firebase, such as **"Save Error: Missing or insufficient permissions."**
+
+If you see that red error message, it is **100% proof** that the problem is your Firebase project's settings. You will need to go back to the Firebase Console and carefully complete the two essential setup steps: **enabling Anonymous Authentication** and **setting the correct Firestore Rules
