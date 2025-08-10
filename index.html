@@ -354,7 +354,7 @@
         <p class="text-slate-500 text-sm">Email: istemamahmed@outlook.com</p>
     </footer>
 
-    <!-- Firebase SDK -->
+   <!-- Firebase SDK -->
     <script type="module">
         // Firebase Config
 const firebaseConfig = {
@@ -390,21 +390,26 @@ const firebaseConfig = {
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUserId = user.uid;
+                console.log("Authentication successful. User ID:", currentUserId);
                 loadAllData();
             } else {
+                console.log("No user signed in. Attempting anonymous sign-in.");
                 try {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
                         await signInAnonymously(auth);
                     }
-                } catch (error) { console.error("Authentication failed:", error); }
+                } catch (error) { console.error("CRITICAL: Anonymous sign-in failed:", error); }
             }
         });
 
         // --- DATA LOADING & LISTENERS ---
         function loadAllData() {
-            if (!currentUserId) return;
+            if (!currentUserId) {
+                console.error("Cannot load data: No User ID.");
+                return;
+            }
             document.getElementById('salesDate').valueAsDate = new Date();
             setupRealtimeListeners();
         }
@@ -626,18 +631,32 @@ const firebaseConfig = {
             `;
         }
 
+        // --- MODIFIED FUNCTION WITH DIAGNOSTICS ---
         async function addCategory() {
             const nameInput = document.getElementById('newCategoryName');
             const name = nameInput.value.trim();
+
+            // --- DIAGNOSTIC LOGS START ---
+            console.log("Attempting to add category...");
+            console.log("Is user signed in? User ID:", currentUserId);
+            // --- DIAGNOSTIC LOGS END ---
+
             if (name && currentUserId) {
                 try {
-                    await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/categories`), { name });
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/categories`), { name });
+                    console.log("SUCCESS: Category added with ID:", docRef.id);
                     nameInput.value = '';
                 } catch (e) {
-                    console.error("Error adding category: ", e);
+                    // This will catch and display the specific Firebase error
+                    console.error("FIREBASE ERROR:", e.message);
+                    alert("Failed to save category. Please check the browser console for errors (Right-click > Inspect > Console). The error is likely 'PERMISSION_DENIED'.");
                 }
+            } else {
+                console.error("FAILED: Cannot add category. User is not signed in (currentUserId is null) or name is empty.");
+                alert("Cannot save category because the app is not connected to the user account. Please ensure Anonymous Sign-in is enabled in your Firebase project's Authentication settings.");
             }
         }
+
 
         async function handleItemFormSubmit(e) {
             e.preventDefault();
@@ -1001,5 +1020,6 @@ const firebaseConfig = {
     </script>
 </body>
 </html>
+
 
 
